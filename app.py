@@ -1295,6 +1295,15 @@ def handle_500(e):
     return render_template('error.html', code=500, message="Terjadi kesalahan pada server. Silakan coba lagi nanti."), 500
 
 # ==================== INIT ====================
+@app.route('/init-database-aspire')
+def force_init():
+    try:
+        # Memanggil fungsi init_db bawaan kodemu untuk create table + insert data admin
+        init_db()
+        return "Database dan Data Admin Default Aspire Berhasil Diinisialisasi!", 200
+    except Exception as e:
+        return f"Gagal melakukan inisialisasi: {str(e)}", 500
+
 def init_db():
     with app.app_context():
         db.create_all()
@@ -1332,15 +1341,6 @@ def init_db():
                 db.session.add(user)
 
         db.session.commit()
-
-@app.route('/init-database-aspire')
-def force_init():
-    try:
-        # Memanggil fungsi init_db bawaan kodemu untuk create table + insert data admin
-        init_db()
-        return "Database dan Data Admin Default Aspire Berhasil Diinisialisasi!", 200
-    except Exception as e:
-        return f"Gagal melakukan inisialisasi: {str(e)}", 500
 
 if __name__ == '__main__':
     init_db()
