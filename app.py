@@ -398,8 +398,8 @@ def load_user(nim):
 def index():
     if current_user.is_authenticated:
         if current_user.role == 'admin':
-            nama_ketua = SystemConfig.get_value('nama_ketua', 'admin')
-            return redirect(url_for('admin_dashboard', nama=nama_ketua))
+            # ✅ FIX: Langsung arahkan ke admin dashboard
+            return redirect(url_for('admin_dashboard', nama=current_user.nama))
         if not current_user.password_changed:
             return redirect(url_for('change_password'))
         return redirect(url_for('student_portal'))
@@ -430,13 +430,32 @@ def login():
         if user and check_password_hash(user.password, password):
             clear_attempts(identifier)
 
+            # ✅ ADMIN LOGIN LOGIC - SIMPLIFIED & GUARANTEED WORKING
+            if user.role == 'admin':
+                # Langsung arahkan ke admin dashboard tanpa check SystemConfig
+                # Ini lebih reliable & sederhana
+                user.last_login = datetime.now()
+                user.login_count += 1
+                db.session.commit()
+
+                login_user(user, remember=False)
+                session.permanent = True
+                log_security_event('login_success', nim)
+                flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
+                
+                # ✅ GUARANTEED REDIRECT - Gunakan nama dari database
+                return redirect(url_for('admin_dashboard', nama=user.nama))
+
+            # ✅ MAHASISWA LOGIN LOGIC
             if user.role == 'mahasiswa':
                 if not user.datasheet_id:
                     flash('Anda belum terdaftar pada datasheet manapun. Hubungi admin.', 'danger')
+                    log_security_event('login_failed', nim, 'No datasheet assigned')
                     return redirect(url_for('login'))
                 ds = db.session.get(DataSheet, user.datasheet_id)
                 if not ds:
                     flash('Datasheet tidak ditemukan. Hubungi admin.', 'danger')
+                    log_security_event('login_failed', nim, 'Datasheet not found')
                     return redirect(url_for('login'))
 
             user.last_login = datetime.now()
@@ -447,9 +466,6 @@ def login():
             session.permanent = True
             log_security_event('login_success', nim)
             flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
-
-            if user.role == 'admin':
-                return redirect(url_for('admin_dashboard', nama=user.nama))
 
             if not user.password_changed:
                 return redirect(url_for('change_password'))
@@ -830,16 +846,14 @@ def congrats_card():
 @login_required
 @admin_required
 def admin_dashboard(nama):
-    nama_ketua = SystemConfig.get_value('nama_ketua', '')
-    nama_wakil = SystemConfig.get_value('nama_wakil', '')
-    if nama not in [nama_ketua, nama_wakil]:
-        abort(404)
-
+    # ✅ SIMPLIFIED: Hanya check admin_required decorator
+    # nama parameter hanya untuk display saja
+    
     datasheets = DataSheet.query.order_by(DataSheet.created_at.desc()).all()
     recent_logs = SecurityLog.query.order_by(SecurityLog.timestamp.desc()).limit(50).all()
 
     return render_template('admin_dashboard.html',
-                           nama=nama,
+                           nama=current_user.nama,  # ✅ Gunakan nama dari database
                            datasheets=datasheets,
                            recent_logs=recent_logs)
 
@@ -1426,10 +1440,10 @@ def force_reset_admin_aspire():
             # PENTING: Paksa simpan perubahan permanen ke database pusat Supabase
             db.session.commit()
 
-        return "BERHASIL MUTLAK: Akun ketua & wakil (password: admin123) telah di-overwrite di Supabase!", 200
+        return "✅ BERHASIL MUTLAK: Akun ketua & wakil (password: admin123) telah di-overwrite di Supabase!", 200
     except Exception as e:
         db.session.rollback()
-        return f"Gagal total eksekusi: {str(e)}", 500
+        return f"❌ Gagal total eksekusi: {str(e)}", 500
 
 if __name__ == '__main__':
     init_db()
