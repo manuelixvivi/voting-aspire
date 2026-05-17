@@ -27,16 +27,27 @@ app = Flask(
 # Secret key from environment
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# Database: Supabase PostgreSQL (mencoba membaca key integrasi Vercel dulu, lalu fallback ke DATABASE_URL lokal)
-db_url = os.environ.get('POSTGRES_URL_POSTGRES_URL') or os.environ.get('DATABASE_URL')
+# 1. Ambil variabel bawaan Supabase Integration di Vercel
+db_url = os.environ.get('POSTGRES_URL_POSTGRES_URL')
+
+# Fallback ke DATABASE_URL lama jika POSTGRES_URL_POSTGRES_URL kosong
+if not db_url:
+    db_url = os.environ.get('DATABASE_URL')
 
 if db_url:
-    # Fix for Supabase URL format (Vercel terkadang memberikan skema postgres://)
+    # 2. Logika Pembersihan: Buang parameter siluman '&supa=' bawaan Supabase
+    if '&supa=' in db_url:
+        db_url = db_url.split('&supa=')[0]
+    elif '?supa=' in db_url:
+        db_url = db_url.split('?supa=')[0]
+
+    # 3. Logika Perbaikan Dialect: Ubah postgres:// menjadi postgresql:// demi SQLAlchemy
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
-    # Fallback to SQLite jika dijalankan di lokal tanpa DB eksternal
+    # Fallback to SQLite untuk testing lokal jika tidak ada internet/env
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sistem_kelas.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
