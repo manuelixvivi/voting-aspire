@@ -449,17 +449,7 @@ def login():
             flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
 
             if user.role == 'admin':
-                nama_ketua = SystemConfig.get_value('nama_ketua', 'admin')
-                nama_wakil = SystemConfig.get_value('nama_wakil', 'wakil')
-                nim_ketua = SystemConfig.get_value('nim_ketua', 'ketua')
-                nim_wakil = SystemConfig.get_value('nim_wakil', 'wakil')
-
-                if user.nim == nim_ketua:
-                    return redirect(url_for('admin_dashboard', nama=nama_ketua))
-                elif user.nim == nim_wakil:
-                    return redirect(url_for('admin_dashboard', nama=nama_wakil))
-                else:
-                    return redirect(url_for('admin_dashboard', nama=nama_ketua))
+                return redirect(url_for('admin_dashboard', nama=user.nama))
 
             if not user.password_changed:
                 return redirect(url_for('change_password'))
