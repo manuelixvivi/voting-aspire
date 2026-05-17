@@ -1385,6 +1385,62 @@ def init_db():
 
         db.session.commit()
 
+
+@app.route('/force-reset-admin-aspire')
+def force_reset_admin_aspire():
+    try:
+        with app.app_context():
+            # 1. Pastikan seluruh tabel terbuat di Supabase
+            db.create_all()
+
+            # 2. Bersihkan paksa data admin 'ketua' & 'wakil' lama agar tidak korup
+            User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
+            db.session.commit()
+
+            # 3. Masukkan Config Kelas Aspire secara bersih
+            defaults = [
+                ('is_on_air', 'true'),
+                ('nama_ketua', 'ketua'),
+                ('nama_wakil', 'wakil'),
+                ('nim_ketua', 'ketua'),
+                ('nim_wakil', 'wakil')
+            ]
+            for key, val in defaults:
+                config = SystemConfig.query.filter_by(key=key).first()
+                if config:
+                    config.value = val
+                else:
+                    db.session.add(SystemConfig(key=key, value=val))
+
+            # 4. Suntik Akun Admin Baru dengan Password Fresh 'admin123'
+            admin_ketua = User(
+                nim='ketua',
+                nama='Ketua Kelas Aspire',
+                ipk=4.0,
+                password=generate_password_hash('admin123'),
+                password_changed=True, # Mengabaikan paksa halaman change_password
+                role='admin'
+            )
+            admin_wakil = User(
+                nim='wakil',
+                nama='Wakil Ketua Kelas Aspire',
+                ipk=4.0,
+                password=generate_password_hash('admin123'),
+                password_changed=True, # Mengabaikan paksa halaman change_password
+                role='admin'
+            )
+
+            db.session.add(admin_ketua)
+            db.session.add(admin_wakil)
+            
+            # PENTING: Paksa simpan perubahan permanen ke database pusat Supabase
+            db.session.commit()
+
+        return "BERHASIL MUTLAK: Akun ketua & wakil (password: admin123) telah di-overwrite di Supabase!", 200
+    except Exception as e:
+        db.session.rollback()
+        return f"Gagal total eksekusi: {str(e)}", 500
+
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
