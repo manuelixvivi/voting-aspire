@@ -15,7 +15,13 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(
+    __name__, 
+    template_folder=os.path.join(base_dir, 'templates'), 
+    static_folder=os.path.join(base_dir, 'static')
+)
 
 # ==================== CONFIGURATION ====================
 # Secret key from environment
