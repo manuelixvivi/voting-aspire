@@ -21,16 +21,16 @@ app = Flask(__name__, template_folder='../templates', static_folder='../static')
 # Secret key from environment
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# Database: Supabase PostgreSQL or SQLite fallback
-# Format: postgresql://user:pass@host:port/dbname
-db_url = os.environ.get('DATABASE_URL')
+# Database: Supabase PostgreSQL (mencoba membaca key integrasi Vercel dulu, lalu fallback ke DATABASE_URL lokal)
+db_url = os.environ.get('POSTGRES_URL_POSTGRES_URL') or os.environ.get('DATABASE_URL')
+
 if db_url:
-    # Fix for Supabase URL format
+    # Fix for Supabase URL format (Vercel terkadang memberikan skema postgres://)
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
-    # Fallback to SQLite for local testing
+    # Fallback to SQLite jika dijalankan di lokal tanpa DB eksternal
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sistem_kelas.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
