@@ -1333,6 +1333,15 @@ def init_db():
 
         db.session.commit()
 
+@app.route('/init-database-aspire')
+def force_init():
+    try:
+        # Memanggil fungsi init_db bawaan kodemu untuk create table + insert data admin
+        init_db()
+        return "Database dan Data Admin Default Aspire Berhasil Diinisialisasi!", 200
+    except Exception as e:
+        return f"Gagal melakukan inisialisasi: {str(e)}", 500
+
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
