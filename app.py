@@ -24,30 +24,27 @@ app = Flask(
 )
 
 # ==================== CONFIGURATION ====================
-# Secret key from environment
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
-# 1. Ambil variabel bawaan Supabase Integration di Vercel
+# Ambil URL Database utama dari environment Vercel
 db_url = os.environ.get('POSTGRES_URL_POSTGRES_URL')
 
-# Fallback ke DATABASE_URL lama jika POSTGRES_URL_POSTGRES_URL kosong
 if not db_url:
     db_url = os.environ.get('DATABASE_URL')
 
 if db_url:
-    # 2. Logika Pembersihan: Buang parameter siluman '&supa=' bawaan Supabase
+    # Bersihkan jika ada string aneh bawaan beberapa tipe integrasi
     if '&supa=' in db_url:
         db_url = db_url.split('&supa=')[0]
     elif '?supa=' in db_url:
         db_url = db_url.split('?supa=')[0]
 
-    # 3. Logika Perbaikan Dialect: Ubah postgres:// menjadi postgresql:// demi SQLAlchemy
+    # Pastikan dialeknya menggunakan postgresql:// bukan postgres://
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
         
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
-    # Fallback to SQLite untuk testing lokal jika tidak ada internet/env
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sistem_kelas.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -1298,11 +1295,57 @@ def handle_500(e):
 @app.route('/init-database-aspire')
 def force_init():
     try:
-        # Memanggil fungsi init_db bawaan kodemu untuk create table + insert data admin
-        init_db()
-        return "Database dan Data Admin Default Aspire Berhasil Diinisialisasi!", 200
+        with app.app_context():
+            # 1. Buat tabel jika belum ada
+            db.create_all()
+
+            # 2. Hapus paksa admin lama di Supabase jika sempat tersimpan setengah matang
+            User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
+            db.session.commit()
+
+            # 3. Masukkan Config Kelas Aspire
+            defaults = [
+                ('is_on_air', 'true'),
+                ('nama_ketua', 'ketua'),
+                ('nama_wakil', 'wakil'),
+                ('nim_ketua', 'ketua'),
+                ('nim_wakil', 'wakil')
+            ]
+            for key, val in defaults:
+                config = SystemConfig.query.filter_by(key=key).first()
+                if config:
+                    config.value = val
+                else:
+                    db.session.add(SystemConfig(key=key, value=val))
+
+            # 4. Inject Akun Admin Baru dengan Role yang JELAS
+            admin_ketua = User(
+                nim='ketua',
+                nama='Ketua Kelas',
+                ipk=4.0,
+                password=generate_password_hash('admin123'),
+                password_changed=True,
+                role='admin'
+            )
+            admin_wakil = User(
+                nim='wakil',
+                nama='Wakil Ketua Kelas',
+                ipk=4.0,
+                password=generate_password_hash('admin123'),
+                password_changed=True,
+                role='admin'
+            )
+
+            db.session.add(admin_ketua)
+            db.session.add(admin_wakil)
+            
+            # PENTING: Paksa simpan ke Supabase saat ini juga!
+            db.session.commit()
+            
+        return "DATABASE REFRESH SUCCESS: Akun ketua & wakil dengan password 'admin123' resmi terdaftar di Supabase!", 200
     except Exception as e:
-        return f"Gagal melakukan inisialisasi: {str(e)}", 500
+        db.session.rollback()
+        return f"Gagal total inisialisasi: {str(e)}", 500
 
 def init_db():
     with app.app_context():
