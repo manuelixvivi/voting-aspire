@@ -58,10 +58,13 @@ app.config['WTF_CSRF_TIME_LIMIT'] = 3600
 # app.config['SESSION_TYPE'] = 'filesystem'  # DIHAPUS - tidak kompatibel dengan Vercel
 
 # FIX: Biarkan Flask default handle session cookies
-# Jangan override SESSION_COOKIE_* kecuali yakin environment-nya
 # Vercel serverless + Flask default cookie-based session = paling kompatibel
+# Jangan set SESSION_COOKIE_SECURE=True kecuali yakin HTTPS penuh
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# FIX: Set cookie name yang unik untuk menghindari konflik
+app.config['SESSION_COOKIE_NAME'] = 'voting_aspire_session'
 
 db = SQLAlchemy(app)
 csrf = CSRFProtect(app)
@@ -402,26 +405,38 @@ def log_security_event(event_type, nim=None, details=None):
 # ==================== AUTO INIT FOR SERVERLESS ====================
 # FIX: Vercel serverless tidak menjalankan __main__ block
 # Inisialisasi database harus dilakukan saat modul di-import
-# Gunakan flag untuk mencegah init berulang kali
-
 _db_initialized = False
 
 def ensure_db_initialized():
     global _db_initialized
     if _db_initialized:
-        return
+        return True
     try:
         with app.app_context():
-            db.create_all()
-            init_db()
+            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
+            db.Model.metadata.create_all(bind=db.engine)
+            app.logger.info("Tables created via metadata.create_all()")
+
+            # Check if admin exists
+            ketua = db.session.get(User, 'ketua')
+            if not ketua:
+                app.logger.info("Admin not found, running init_db()")
+                init_db()
+                # Verify after init
+                ketua_check = db.session.get(User, 'ketua')
+                app.logger.info(f"After init_db: ketua exists = {ketua_check is not None}")
+            else:
+                app.logger.info("Admin already exists, skipping init_db()")
         _db_initialized = True
-        app.logger.info("✅ Database auto-initialized for serverless")
+        app.logger.info("✅ Auto-init complete")
+        return True
     except Exception as e:
         app.logger.error(f"❌ Auto-init failed: {e}")
         import traceback
         app.logger.error(traceback.format_exc())
+        return False
 
-# Panggil sekali saat modul di-load
+# Try to init on module load
 ensure_db_initialized()
 
 # ==================== ROUTES ====================
@@ -449,6 +464,9 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # FIX: Ensure DB is initialized before login attempt
+    ensure_db_initialized()
+
     if request.method == 'POST':
         nim = sanitize_input(request.form.get('nim', '')).strip()
         password = request.form.get('password', '')
@@ -1317,8 +1335,10 @@ def security_logs():
 def debug_admin():
     """Debug endpoint untuk cek status akun admin"""
     try:
+        # Ensure init first
+        init_success = ensure_db_initialized()
         with app.app_context():
-            db.create_all()
+            db.Model.metadata.create_all(bind=db.engine)
 
             # Check if admin exists
             ketua = db.session.get(User, 'ketua')
@@ -1327,6 +1347,7 @@ def debug_admin():
             result = {
                 'ketua_exists': ketua is not None,
                 'wakil_exists': wakil is not None,
+                'auto_init_success': init_success,
                 'database_url_set': bool(os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL_POSTGRES_URL')),
                 'secret_key_set': bool(os.environ.get('SECRET_KEY')),
             }
@@ -1377,7 +1398,7 @@ def force_init():
     try:
         with app.app_context():
             # 1. Buat tabel jika belum ada
-            db.create_all()
+            db.Model.metadata.create_all(bind=db.engine)
 
             # 2. Hapus paksa admin lama di Supabase jika sempat tersimpan setengah matang
             User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
@@ -1474,10 +1495,13 @@ def force_reset_admin_aspire():
             db.create_all()
             app.logger.info("Tables created/verified")
 
-            # 2. Bersihkan paksa data admin 'ketua' & 'wakil' lama agar tidak korup
-            deleted = User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
+            # 2. Hapus admin lama jika ada (ignore if not exists)
+            for nim in ['ketua', 'wakil']:
+                old = db.session.get(User, nim)
+                if old:
+                    db.session.delete(old)
             db.session.commit()
-            app.logger.info(f"Deleted {deleted} old admin records")
+            app.logger.info("Old admin records deleted if any")
 
             # 3. Masukkan Config Kelas Aspire secara bersih
             defaults = [
@@ -1496,8 +1520,7 @@ def force_reset_admin_aspire():
             db.session.commit()
             app.logger.info("System config updated")
 
-            # 4. Suntik Akun Admin Baru dengan Password Fresh 'admin123'
-            # FIX: Explicitly use pbkdf2 for compatibility
+            # 4. Buat akun admin baru dengan password 'admin123'
             admin_ketua = User(
                 nim='ketua',
                 nama='Ketua Kelas Aspire',
@@ -1517,8 +1540,6 @@ def force_reset_admin_aspire():
 
             db.session.add(admin_ketua)
             db.session.add(admin_wakil)
-
-            # PENTING: Paksa simpan perubahan permanen ke database pusat Supabase
             db.session.commit()
             app.logger.info("Admin accounts created successfully")
 
