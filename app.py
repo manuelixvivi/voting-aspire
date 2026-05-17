@@ -24,7 +24,7 @@ app = Flask(
 )
 
 # ==================== CONFIGURATION ====================
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-please-change-in-production')
 
 # Ambil URL Database utama dari environment Vercel
 db_url = os.environ.get('POSTGRES_URL_POSTGRES_URL')
@@ -57,10 +57,9 @@ app.config['WTF_CSRF_TIME_LIMIT'] = 3600
 # Flask default menggunakan client-side signed cookies yang cocok untuk serverless
 # app.config['SESSION_TYPE'] = 'filesystem'  # DIHAPUS - tidak kompatibel dengan Vercel
 
-# FIX: Tambahkan konfigurasi session cookie untuk serverless
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# FIX: Biarkan Flask default handle session cookies
+# Jangan override SESSION_COOKIE_* kecuali yakin environment-nya
+# Vercel serverless + Flask default cookie-based session = paling kompatibel
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
@@ -401,14 +400,17 @@ def log_security_event(event_type, nim=None, details=None):
         db.session.rollback()
 
 # ==================== ROUTES ====================
-# FIX: Perbarui user_loader dengan fallback ke session
 @login_manager.user_loader
 def load_user(nim):
+    # FIX: Untuk serverless, juga cek session jika nim tidak langsung tersedia
     if not nim:
         nim = session.get('user_id')
     if not nim:
         return None
-    return db.session.get(User, nim)
+    try:
+        return db.session.get(User, nim)
+    except Exception:
+        return None
 
 @app.route('/')
 def index():
@@ -445,20 +447,21 @@ def login():
         if user and check_password_hash(user.password, password):
             clear_attempts(identifier)
 
-            # FIX: Set session permanent SEBELUM login_user
-            session.permanent = True
-
-            # FIX: Login user dengan remember=False (lebih aman untuk serverless)
-            login_user(user, remember=False)
-
-            # FIX: Simpan user_id eksplisit di session untuk kompatibilitas
-            session['user_id'] = user.nim
-            session['_fresh'] = True
-
-            # FIX: Commit perubahan user ke database
+            # FIX: Commit perubahan user ke database SEBELUM set session
+            # Di serverless, commit segera untuk menghindari race condition
             user.last_login = datetime.now()
             user.login_count += 1
             db.session.commit()
+
+            # FIX: Set session permanent SEBELUM login_user
+            session.permanent = True
+
+            # FIX: Simpan user_id di session untuk kompatibilitas serverless
+            session['user_id'] = user.nim
+            session['_fresh'] = True
+
+            # FIX: Login user setelah session siap
+            login_user(user, remember=False)
 
             log_security_event('login_success', nim)
             flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
@@ -535,7 +538,8 @@ def change_password():
 def logout():
     log_security_event('logout', current_user.nim)
     logout_user()
-    session.clear()  # FIX: Bersihkan session saat logout
+    # FIX: Bersihkan session sepenuhnya saat logout
+    session.clear()
     flash('Anda telah keluar dari sistem.', 'info')
     return redirect(url_for('login'))
 
