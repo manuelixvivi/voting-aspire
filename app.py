@@ -399,6 +399,31 @@ def log_security_event(event_type, nim=None, details=None):
     except Exception:
         db.session.rollback()
 
+# ==================== AUTO INIT FOR SERVERLESS ====================
+# FIX: Vercel serverless tidak menjalankan __main__ block
+# Inisialisasi database harus dilakukan saat modul di-import
+# Gunakan flag untuk mencegah init berulang kali
+
+_db_initialized = False
+
+def ensure_db_initialized():
+    global _db_initialized
+    if _db_initialized:
+        return
+    try:
+        with app.app_context():
+            db.create_all()
+            init_db()
+        _db_initialized = True
+        app.logger.info("✅ Database auto-initialized for serverless")
+    except Exception as e:
+        app.logger.error(f"❌ Auto-init failed: {e}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+
+# Panggil sekali saat modul di-load
+ensure_db_initialized()
+
 # ==================== ROUTES ====================
 @login_manager.user_loader
 def load_user(nim):
@@ -1287,6 +1312,43 @@ def security_logs():
     total = logs_query.count()
     return render_template('admin_security_logs.html', logs=logs, page=page, total=total, per_page=per_page)
 
+# ==================== DEBUG ENDPOINTS ====================
+@app.route('/debug-admin')
+def debug_admin():
+    """Debug endpoint untuk cek status akun admin"""
+    try:
+        with app.app_context():
+            db.create_all()
+
+            # Check if admin exists
+            ketua = db.session.get(User, 'ketua')
+            wakil = db.session.get(User, 'wakil')
+
+            result = {
+                'ketua_exists': ketua is not None,
+                'wakil_exists': wakil is not None,
+                'database_url_set': bool(os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL_POSTGRES_URL')),
+                'secret_key_set': bool(os.environ.get('SECRET_KEY')),
+            }
+
+            if ketua:
+                result['ketua_role'] = ketua.role
+                result['ketua_password_hash_prefix'] = ketua.password[:20] + '...' if ketua.password else 'None'
+                # Test password check
+                from werkzeug.security import check_password_hash
+                result['ketua_password_valid'] = check_password_hash(ketua.password, 'admin123')
+
+            if wakil:
+                result['wakil_role'] = wakil.role
+                result['wakil_password_hash_prefix'] = wakil.password[:20] + '...' if wakil.password else 'None'
+                from werkzeug.security import check_password_hash
+                result['wakil_password_valid'] = check_password_hash(wakil.password, 'admin123')
+
+            return jsonify(result), 200
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
 # ==================== ERROR HANDLERS ====================
 @app.errorhandler(400)
 def handle_400(e):
@@ -1395,7 +1457,7 @@ def init_db():
                     nim=nim,
                     nama=nama,
                     ipk=ipk,
-                    password=generate_password_hash('admin123'),
+                    password=generate_password_hash('admin123', method='pbkdf2'),
                     password_changed=True,
                     role=role
                 )
@@ -1410,10 +1472,12 @@ def force_reset_admin_aspire():
         with app.app_context():
             # 1. Pastikan seluruh tabel terbuat di Supabase
             db.create_all()
+            app.logger.info("Tables created/verified")
 
             # 2. Bersihkan paksa data admin 'ketua' & 'wakil' lama agar tidak korup
-            User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
+            deleted = User.query.filter(User.nim.in_(['ketua', 'wakil'])).delete(synchronize_session=False)
             db.session.commit()
+            app.logger.info(f"Deleted {deleted} old admin records")
 
             # 3. Masukkan Config Kelas Aspire secara bersih
             defaults = [
@@ -1429,22 +1493,25 @@ def force_reset_admin_aspire():
                     config.value = val
                 else:
                     db.session.add(SystemConfig(key=key, value=val))
+            db.session.commit()
+            app.logger.info("System config updated")
 
             # 4. Suntik Akun Admin Baru dengan Password Fresh 'admin123'
+            # FIX: Explicitly use pbkdf2 for compatibility
             admin_ketua = User(
                 nim='ketua',
                 nama='Ketua Kelas Aspire',
                 ipk=4.0,
-                password=generate_password_hash('admin123'),
-                password_changed=True, # Mengabaikan paksa halaman change_password
+                password=generate_password_hash('admin123', method='pbkdf2'),
+                password_changed=True,
                 role='admin'
             )
             admin_wakil = User(
                 nim='wakil',
                 nama='Wakil Ketua Kelas Aspire',
                 ipk=4.0,
-                password=generate_password_hash('admin123'),
-                password_changed=True, # Mengabaikan paksa halaman change_password
+                password=generate_password_hash('admin123', method='pbkdf2'),
+                password_changed=True,
                 role='admin'
             )
 
@@ -1453,11 +1520,14 @@ def force_reset_admin_aspire():
 
             # PENTING: Paksa simpan perubahan permanen ke database pusat Supabase
             db.session.commit()
+            app.logger.info("Admin accounts created successfully")
 
-        return "✅ BERHASIL MUTLAK: Akun ketua & wakil (password: admin123) telah di-overwrite di Supabase!", 200
+        return "✅ BERHASIL: Akun ketua & wakil (password: admin123) telah di-reset! Silakan login sekarang.", 200
     except Exception as e:
         db.session.rollback()
-        return f"❌ Gagal total eksekusi: {str(e)}", 500
+        import traceback
+        app.logger.error(f"Reset failed: {traceback.format_exc()}")
+        return f"❌ Gagal: {str(e)}", 500
 
 if __name__ == '__main__':
     init_db()
