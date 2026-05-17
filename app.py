@@ -42,7 +42,7 @@ if db_url:
     # Pastikan dialeknya menggunakan postgresql:// bukan postgres://
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
-        
+
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sistem_kelas.db'
@@ -53,8 +53,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_ENABLED'] = True
 app.config['WTF_CSRF_TIME_LIMIT'] = 3600
 
-# Session config for serverless
-app.config['SESSION_TYPE'] = 'filesystem'
+# FIX: Hapus SESSION_TYPE filesystem untuk Vercel serverless
+# Flask default menggunakan client-side signed cookies yang cocok untuk serverless
+# app.config['SESSION_TYPE'] = 'filesystem'  # DIHAPUS - tidak kompatibel dengan Vercel
+
+# FIX: Tambahkan konfigurasi session cookie untuk serverless
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
@@ -65,6 +71,10 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Silakan login untuk mengakses halaman ini.'
 login_manager.login_message_category = 'warning'
 
+# FIX: Set session protection ke basic untuk serverless
+# Strong mode bisa menyebabkan logout tiba-tiba di serverless
+login_manager.session_protection = "basic"
+
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 
@@ -74,7 +84,8 @@ def set_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # FIX: Hapus Strict-Transport-Security jika belum pakai HTTPS
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
         "script-src 'self'; "
@@ -134,7 +145,7 @@ def sanitize_input(text, max_length=2000):
     text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
     text = re.sub(r'data:', '', text, flags=re.IGNORECASE)
     text = re.sub(r'vbscript:', '', text, flags=re.IGNORECASE)
-    text = re.sub(r"on\w+\s*=\s*[\"']?[^\"'>]*[\"']?", '', text, flags=re.IGNORECASE)
+    text = re.sub(r'on\w+\s*=\s*["\']?[^"\'>]*["\']?', '', text, flags=re.IGNORECASE)
     text = re.sub(r'expression\(', '', text, flags=re.IGNORECASE)
     text = html.escape(text)
     return text
@@ -390,15 +401,19 @@ def log_security_event(event_type, nim=None, details=None):
         db.session.rollback()
 
 # ==================== ROUTES ====================
+# FIX: Perbarui user_loader dengan fallback ke session
 @login_manager.user_loader
 def load_user(nim):
+    if not nim:
+        nim = session.get('user_id')
+    if not nim:
+        return None
     return db.session.get(User, nim)
 
 @app.route('/')
 def index():
     if current_user.is_authenticated:
         if current_user.role == 'admin':
-            # ✅ FIX: Langsung arahkan ke admin dashboard
             return redirect(url_for('admin_dashboard', nama=current_user.nama))
         if not current_user.password_changed:
             return redirect(url_for('change_password'))
@@ -430,23 +445,29 @@ def login():
         if user and check_password_hash(user.password, password):
             clear_attempts(identifier)
 
-            # ✅ ADMIN LOGIN LOGIC - SIMPLIFIED & GUARANTEED WORKING
-            if user.role == 'admin':
-                # Langsung arahkan ke admin dashboard tanpa check SystemConfig
-                # Ini lebih reliable & sederhana
-                user.last_login = datetime.now()
-                user.login_count += 1
-                db.session.commit()
+            # FIX: Set session permanent SEBELUM login_user
+            session.permanent = True
 
-                login_user(user, remember=False)
-                session.permanent = True
-                log_security_event('login_success', nim)
-                flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
-                
-                # ✅ GUARANTEED REDIRECT - Gunakan nama dari database
+            # FIX: Login user dengan remember=False (lebih aman untuk serverless)
+            login_user(user, remember=False)
+
+            # FIX: Simpan user_id eksplisit di session untuk kompatibilitas
+            session['user_id'] = user.nim
+            session['_fresh'] = True
+
+            # FIX: Commit perubahan user ke database
+            user.last_login = datetime.now()
+            user.login_count += 1
+            db.session.commit()
+
+            log_security_event('login_success', nim)
+            flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
+
+            # ADMIN LOGIN LOGIC
+            if user.role == 'admin':
                 return redirect(url_for('admin_dashboard', nama=user.nama))
 
-            # ✅ MAHASISWA LOGIN LOGIC
+            # MAHASISWA LOGIN LOGIC
             if user.role == 'mahasiswa':
                 if not user.datasheet_id:
                     flash('Anda belum terdaftar pada datasheet manapun. Hubungi admin.', 'danger')
@@ -458,18 +479,9 @@ def login():
                     log_security_event('login_failed', nim, 'Datasheet not found')
                     return redirect(url_for('login'))
 
-            user.last_login = datetime.now()
-            user.login_count += 1
-            db.session.commit()
-
-            login_user(user, remember=False)
-            session.permanent = True
-            log_security_event('login_success', nim)
-            flash(f'Selamat datang, {sanitize_input(user.nama)}.', 'success')
-
-            if not user.password_changed:
-                return redirect(url_for('change_password'))
-            return redirect(url_for('student_portal'))
+                if not user.password_changed:
+                    return redirect(url_for('change_password'))
+                return redirect(url_for('student_portal'))
         else:
             record_failed_attempt(identifier)
             log_security_event('login_failed', nim, 'Invalid credentials')
@@ -523,6 +535,7 @@ def change_password():
 def logout():
     log_security_event('logout', current_user.nim)
     logout_user()
+    session.clear()  # FIX: Bersihkan session saat logout
     flash('Anda telah keluar dari sistem.', 'info')
     return redirect(url_for('login'))
 
@@ -846,14 +859,11 @@ def congrats_card():
 @login_required
 @admin_required
 def admin_dashboard(nama):
-    # ✅ SIMPLIFIED: Hanya check admin_required decorator
-    # nama parameter hanya untuk display saja
-    
     datasheets = DataSheet.query.order_by(DataSheet.created_at.desc()).all()
     recent_logs = SecurityLog.query.order_by(SecurityLog.timestamp.desc()).limit(50).all()
 
     return render_template('admin_dashboard.html',
-                           nama=current_user.nama,  # ✅ Gunakan nama dari database
+                           nama=current_user.nama,
                            datasheets=datasheets,
                            recent_logs=recent_logs)
 
@@ -1342,10 +1352,10 @@ def force_init():
 
             db.session.add(admin_ketua)
             db.session.add(admin_wakil)
-            
+
             # PENTING: Paksa simpan ke Supabase saat ini juga!
             db.session.commit()
-            
+
         return "DATABASE REFRESH SUCCESS: Akun ketua & wakil dengan password 'admin123' resmi terdaftar di Supabase!", 200
     except Exception as e:
         db.session.rollback()
@@ -1436,7 +1446,7 @@ def force_reset_admin_aspire():
 
             db.session.add(admin_ketua)
             db.session.add(admin_wakil)
-            
+
             # PENTING: Paksa simpan perubahan permanen ke database pusat Supabase
             db.session.commit()
 
