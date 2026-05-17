@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Pilih Saran Divisi - {{ datasheet.name }}{% endblock %}
+
+{% block content %}
+<div class="student-wrapper">
+    <!-- Datasheet Info Bar -->
+    <div class="card datasheet-bar">
+        <div class="ds-info">
+            <span class="ds-label">DATASHEET AKTIF</span>
+            <span class="ds-name">{{ datasheet.name }}</span>
+            <span class="badge badge-blue">{{ datasheet.phase|upper }}</span>
+        </div>
+        {% if time_remaining %}
+        <div class="ds-deadline">
+            <span class="dl-label">Sisa Waktu:</span>
+            <span id="live-countdown" class="dl-value font-monospace" data-ds-id="{{ datasheet.id }}">
+                {{ time_remaining.days }} hari {{ time_remaining.hours }} jam {{ time_remaining.minutes }} menit
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sub-Menu Navigation -->
+    {% if nav_items %}
+    <div class="card">
+        <h3 class="card-title">Navigasi Pengisian</h3>
+        <div class="student-tab-menu tab-menu">
+            {% for item in nav_items %}
+            <a href="{{ url_for('go_to_step', step_id=item.id) }}" 
+               class="tab-link {% if request.endpoint == item.url %}active{% endif %}
+                      {% if not item.accessible %}disabled{% endif %}">
+                <span class="tab-step">{% if item.completed %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>
+                <span>{{ item.name }}</span>
+                {% if item.completed %}
+                    <span class="tab-status done">Selesai</span>
+                {% elif item.accessible %}
+                    <span class="tab-status current">Buka</span>
+                {% else %}
+                    <span class="tab-status">Terkunci</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Form -->
+    <div class="card">
+        <h3 class="card-title" style="color: var(--primary);">Tawaran Personal dari Admin</h3>
+        <p class="section-desc">Silakan pilih salah satu tawaran atau tolak semua untuk memilih divisi lain.</p>
+
+        <form method="POST" action="{{ url_for('submit_saran') }}" id="saranForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="tawaran_diterima" id="tawaran_diterima" value="">
+
+            <div class="tawaran-options">
+                <!-- Tawaran 1 -->
+                {% if current_user.tawaran1 %}
+                <div class="tawaran-card" id="card-tawaran1" onclick="selectTawaran('tawaran1')">
+                    <div class="tawaran-radio">
+                        <input type="radio" name="pilihan" id="tawaran1" value="terima" required>
+                    </div>
+                    <div class="tawaran-content">
+                        <div class="tawaran-title">{{ current_user.tawaran1 }}</div>
+                        {% if current_user.alasan_tawaran1 %}
+                        <div class="tawaran-alasan-admin">{{ current_user.alasan_tawaran1 }}</div>
+                        {% endif %}
+                        <span class="tawaran-badge">Tawaran 1</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Tawaran 2 -->
+                {% if current_user.tawaran2 %}
+                <div class="tawaran-card" id="card-tawaran2" onclick="selectTawaran('tawaran2')">
+                    <div class="tawaran-radio">
+                        <input type="radio" name="pilihan" id="tawaran2" value="terima">
+                    </div>
+                    <div class="tawaran-content">
+                        <div class="tawaran-title">{{ current_user.tawaran2 }}</div>
+                        {% if current_user.alasan_tawaran2 %}
+                        <div class="tawaran-alasan-admin">{{ current_user.alasan_tawaran2 }}</div>
+                        {% endif %}
+                        <span class="tawaran-badge badge-2">Tawaran 2</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Tolak Semua -->
+                <div class="tawaran-card tawaran-reject" id="card-tolak" onclick="selectTawaran('tolak')">
+                    <div class="tawaran-radio">
+                        <input type="radio" name="pilihan" id="tolak" value="tolak">
+                    </div>
+                    <div class="tawaran-content">
+                        <div class="tawaran-title">Tolak Semua Tawaran</div>
+                        <p class="tawaran-desc">Pilih divisi lain sesuai keinginan Anda.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Divisi Custom (shown when Tolak selected) -->
+            <div id="divisi-custom-wrapper" style="display:none; margin-top: 16px;">
+                <div class="card" style="border-left: 4px solid var(--warning); background: #FEF3C7;">
+                    <h4 style="color: var(--warning); margin-bottom: 12px;">Pilih Divisi Lain</h4>
+                    <div class="form-group">
+                        <label>Divisi Tujuan <span style="color: var(--danger);">*</span></label>
+                        <select name="divisi_custom" id="divisi_custom">
+                            <option value="">-- Pilih Divisi --</option>
+                            {% for div in datasheet.divisions %}
+                            <option value="{{ div.name }}">{{ div.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Alasan Penolakan <span style="color: var(--danger);">*</span> <small style="color: var(--text-secondary);">(min. 10 karakter)</small></label>
+                        <textarea name="alasan_penolakan" rows="3" 
+                            placeholder="Jelaskan alasan Anda menolak tawaran dan memilih divisi lain..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="form-actions" style="margin-top: 24px;">
+                <button type="submit" class="btn-submit">Lanjutkan</button>
+                <a href="{{ url_for('student_dashboard') }}" class="btn-secondary">Kembali ke Dashboard</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/saran-form.js') }}"></script>
+{% if time_remaining %}
+<script src="{{ url_for('static', filename='js/countdown.js') }}"></script>
+<script src="{{ url_for('static', filename='js/init-countdown.js') }}"></script>
+{% endif %}
+{% endblock %}

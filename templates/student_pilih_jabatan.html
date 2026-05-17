@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Pilih Jabatan - {{ datasheet.name }}{% endblock %}
+
+{% block content %}
+<div class="student-wrapper">
+    <!-- Datasheet Info Bar -->
+    <div class="card datasheet-bar">
+        <div class="ds-info">
+            <span class="ds-label">DATASHEET AKTIF</span>
+            <span class="ds-name">{{ datasheet.name }}</span>
+            <span class="badge badge-blue">{{ datasheet.phase|upper }}</span>
+        </div>
+        {% if time_remaining %}
+        <div class="ds-deadline">
+            <span class="dl-label">Sisa Waktu:</span>
+            <span id="live-countdown" class="dl-value font-monospace" data-ds-id="{{ datasheet.id }}">
+                {{ time_remaining.days }} hari {{ time_remaining.hours }} jam {{ time_remaining.minutes }} menit
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sub-Menu Navigation -->
+    {% if nav_items %}
+    <div class="card">
+        <h3 class="card-title">Navigasi Pengisian</h3>
+        <div class="student-tab-menu tab-menu">
+            {% for item in nav_items %}
+            <a href="{{ url_for('go_to_step', step_id=item.id) }}" 
+               class="tab-link {% if request.endpoint == item.url %}active{% endif %}
+                      {% if not item.accessible %}disabled{% endif %}">
+                <span class="tab-step">{% if item.completed %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>
+                <span>{{ item.name }}</span>
+                {% if item.completed %}
+                    <span class="tab-status done">Selesai</span>
+                {% elif item.accessible %}
+                    <span class="tab-status current">Buka</span>
+                {% else %}
+                    <span class="tab-status">Terkunci</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Jabatan Form -->
+    <div class="card">
+        <h3 class="card-title" style="color: var(--primary);">Pilih Jabatan</h3>
+        <p class="section-desc">Divisi Anda: <strong>{{ current_user.divisi_final }}</strong></p>
+
+        {% if not current_user.is_elite() %}
+        <div class="alert alert-info">
+            <strong>Info:</strong> IPK Anda ({{ current_user.ipk }}) tidak memenuhi syarat Koordinator (min. 3.51). 
+            Anda otomatis akan menjadi Anggota.
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('submit_jabatan') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="radio-group">
+                <div class="radio-option {% if not current_user.is_elite() %}disabled{% endif %}">
+                    <input type="radio" name="jabatan" id="jabatan_koordinator" value="Koordinator"
+                           {% if not current_user.is_elite() %}disabled{% endif %} required>
+                    <label for="jabatan_koordinator">Koordinator</label>
+                    {% if not current_user.is_elite() %}
+                    <span class="radio-hint">Tidak Tersedia (IPK < 3.51)</span>
+                    {% endif %}
+                </div>
+
+                <div class="radio-option">
+                    <input type="radio" name="jabatan" id="jabatan_anggota" value="Anggota" checked>
+                    <label for="jabatan_anggota">Anggota</label>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 24px;">
+                <button type="submit" class="btn-submit">Simpan & Lanjutkan</button>
+                <a href="{{ url_for('student_dashboard') }}" class="btn-secondary">Kembali</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if time_remaining %}
+<script src="{{ url_for('static', filename='js/countdown.js') }}"></script>
+<script src="{{ url_for('static', filename='js/init-countdown.js') }}"></script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Tahap Evaluasi{% endblock %}
+{% block content %}
+<div class="student-wrapper">
+    <div class="card datasheet-bar">
+        <div class="ds-info">
+            <span class="ds-label">Datasheet Aktif</span>
+            <span class="ds-name">{{ datasheet.name }}</span>
+            <span class="badge badge-orange">EVALUATION</span>
+        </div>
+    </div>
+
+    <div class="card wait-card">
+        <div class="wait-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <h2 class="wait-title">Tahap Evaluasi Sedang Berlangsung</h2>
+        <p class="wait-desc">Pilihan Anda telah tersimpan dan sedang dalam proses evaluasi oleh admin.</p>
+        <p class="wait-desc">Silakan kembali lagi nanti untuk melihat pengumuman hasil penempatan divisi Anda.</p>
+
+        <div class="wait-summary">
+            <div class="wait-item">
+                <span class="wait-label">Jabatan Diajukan</span>
+                <span class="wait-value">{{ current_user.jabatan_final or '-' }}</span>
+            </div>
+            <div class="wait-item">
+                <span class="wait-label">Divisi Diajukan</span>
+                <span class="wait-value">{{ current_user.divisi_final or '-' }}</span>
+            </div>
+            {% if current_user.alasan_penolakan %}
+            <div class="wait-item full-width">
+                <span class="wait-label">Alasan Penolakan Tawaran</span>
+                <span class="wait-value" style="font-size:14px;font-weight:400;">{{ current_user.alasan_penolakan }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

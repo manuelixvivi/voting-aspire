@@ -1,0 +1,5 @@
+nim,nama,ipk,password,tawaran1,alasan_tawaran1,tawaran2,alasan_tawaran2
+CONTOH,Nama Lengkap,3.50,pass123,Divisi Akademik,Alasan memilih,Divisi Humas,Alasan memilih
+20210001,Andi Wijaya,3.85,pass123,Divisi Akademik,Prestasi akademik baik,Divisi Humas,Aktif di organisasi
+20210002,Budi Santoso,3.20,pass123,Divisi Humas,Komunikasi baik,Divisi PSDM,Suka membantu
+20210003,Citra Lestari,3.75,pass123,Divisi Akademik,IPK tinggi,Divisi Olahraga,Aktif berolahraga

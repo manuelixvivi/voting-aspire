@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Error {{ code }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1 style="color:#DC2626;font-size:48px;margin-bottom:8px;">{{ code }}</h1>
+                <p>{{ message }}</p>
+            </div>
+            <a href="{{ url_for('index') }}" class="btn-submit" style="display:inline-block;text-align:center;text-decoration:none;">Kembali ke Beranda</a>
+        </div>
+    </div>
+</body>
+</html>

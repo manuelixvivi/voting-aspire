@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Security Logs{% endblock %}
+{% block content %}
+<div class="admin-wrapper">
+    <div class="admin-header">
+        <div>
+            <h1 class="page-title">Security Logs</h1>
+            <p class="page-subtitle">Riwayat keamanan sistem</p>
+        </div>
+        <a href="{{ url_for('admin_dashboard', nama='ketua') }}" class="btn-sm">Kembali</a>
+    </div>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>Event</th>
+                        <th>NIM</th>
+                        <th>IP Address</th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp.strftime('%d %b %H:%M:%S') }}</td>
+                        <td><span class="badge {% if 'failed' in log.event_type or 'bypass' in log.event_type or 'denied' in log.event_type %}badge-red{% else %}badge-green{% endif %}">{{ log.event_type }}</span></td>
+                        <td>{{ log.nim or '-' }}</td>
+                        <td>{{ log.ip_address or '-' }}</td>
+                        <td class="td-small">{{ log.details or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Belum ada log.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

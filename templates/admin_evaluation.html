@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Evaluasi Data Sheet{% endblock %}
+{% block content %}
+<div class="admin-wrapper">
+    <div class="admin-header">
+        <div>
+            <h1 class="page-title">Evaluasi: {{ datasheet.name }}</h1>
+            <p class="page-subtitle">Tinjau dan tetapkan penempatan akhir mahasiswa</p>
+        </div>
+        <div class="header-actions">
+            <span class="badge phase-badge phase-{{ datasheet.phase }}">Fase: {{ datasheet.phase }}</span>
+            <a href="{{ url_for('admin_dashboard', nama='ketua') }}" class="btn-sm">Kembali</a>
+        </div>
+    </div>
+
+    <!-- ANNOUNCEMENT MESSAGE -->
+    <div class="card" style="border-left: 4px solid var(--primary); background: var(--primary-light);">
+        <h3 class="card-title" style="color: var(--primary-dark);">Pesan Pengumuman</h3>
+        <p class="section-desc">Pesan ini akan ditampilkan kepada semua mahasiswa di kartu pengumuman (congrats card).</p>
+        <form method="POST" action="{{ url_for('save_announcement_message', ds_id=datasheet.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <textarea name="announcement_message" rows="3" placeholder="Contoh: Selamat atas penempatan Anda! Silakan menghadiri rapat koordinasi pada hari Senin, 20 Januari 2025 pukul 09.00 di Ruang Aula.">{{ datasheet.announcement_message or '' }}</textarea>
+            </div>
+            <div style="text-align: right;">
+                <button type="submit" class="btn-submit" style="width: auto; padding: 10px 24px;">Simpan Pesan</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h4 class="sub-title">Master Divisi</h4>
+        <div class="divisi-tags">
+            {% for div in divisions %}
+            <span class="divisi-tag">{{ div }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- STUDENT EVALUATION CARDS -->
+    <form method="POST" action="{{ url_for('save_evaluation', ds_id=datasheet.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% for m in students %}
+        <div class="card" style="margin-bottom: 16px;">
+            <!-- Compact Header: NIM + IPK + Password Reset -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="td-nim" style="font-size: 18px;">{{ m.nim }}</span>
+                        <span style="font-weight: 600; font-size: 16px;">{{ m.nama }}</span>
+                    </div>
+                    <span class="badge {% if m.ipk > 3.5 %}badge-blue{% else %}badge-gray{% endif %}">
+                        IPK {{ m.ipk }}{% if m.ipk > 3.5 %} (ELITE){% endif %}
+                    </span>
+                </div>
+                <form method="POST" action="{{ url_for('reset_password', ds_id=datasheet.id, nim=m.nim) }}" class="inline-form" onsubmit="event.stopPropagation();" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" name="new_password" placeholder="Password baru" class="input-sm" style="width: 130px;" required>
+                    <button type="submit" class="btn-sm btn-red">Reset</button>
+                </form>
+            </div>
+
+            <!-- Tawaran Info -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                {% if m.tawaran1 %}
+                <div style="background: var(--primary-light); padding: 12px; border-radius: 6px; border-left: 3px solid var(--primary);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px;">TAWARAN 1</div>
+                    <div style="font-weight: 600;">{{ m.tawaran1 }}</div>
+                    {% if m.alasan_tawaran1 %}
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">{{ m.alasan_tawaran1 }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if m.tawaran2 %}
+                <div style="background: #D1FAE5; padding: 12px; border-radius: 6px; border-left: 3px solid var(--success);">
+                    <div style="font-size: 11px; font-weight: 700; color: #065F46; margin-bottom: 4px;">TAWARAN 2</div>
+                    <div style="font-weight: 600;">{{ m.tawaran2 }}</div>
+                    {% if m.alasan_tawaran2 %}
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">{{ m.alasan_tawaran2 }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Penolakan -->
+            {% if m.alasan_penolakan %}
+            <div style="background: #FEF2F2; padding: 12px; border-radius: 6px; border-left: 3px solid var(--danger); margin-bottom: 16px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--danger); margin-bottom: 4px;">ALASAN PENOLAKAN</div>
+                <div style="font-size: 13px;">{{ m.alasan_penolakan }}</div>
+            </div>
+            {% endif %}
+
+            <!-- Admin Inputs -->
+            <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; background: var(--bg); padding: 16px; border-radius: 8px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Jabatan Final</label>
+                    <select name="jabatan_{{ m.nim }}" class="select-sm" style="min-width: 140px;">
+                        <option value="" {% if not m.jabatan_final %}selected{% endif %}>- Pilih -</option>
+                        <option value="Koordinator" {% if m.jabatan_final == 'Koordinator' %}selected{% endif %}>Koordinator</option>
+                        <option value="Anggota" {% if m.jabatan_final == 'Anggota' %}selected{% endif %}>Anggota</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Divisi Final</label>
+                    <select name="divisi_{{ m.nim }}" class="select-sm" style="min-width: 160px;">
+                        <option value="" {% if not m.divisi_final %}selected{% endif %}>- Pilih -</option>
+                        {% for div in divisions %}
+                        <option value="{{ div }}" {% if m.divisi_final == div %}selected{% endif %}>{{ div }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Status</label>
+                    {% if m.jabatan_final %}
+                    <span class="badge badge-green">SELESAI</span>
+                    {% else %}
+                    <span class="badge badge-gray">PROSES</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="card eval-actions" style="margin-top: 24px;">
+            <p class="eval-note">Perubahan jabatan dan divisi final akan ditampilkan kepada mahasiswa saat fase diubah ke Announcement.</p>
+            <button type="submit" class="btn-submit btn-wide">Simpan Evaluasi</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}{{ datasheet.name }} - Detail{% endblock %}
+{% block content %}
+<div class="admin-wrapper">
+    <div class="admin-header">
+        <div>
+            <h1 class="page-title">{{ datasheet.name }}</h1>
+            <p class="page-subtitle">{{ datasheet.description or 'Tidak ada deskripsi' }}</p>
+        </div>
+        <div class="header-actions">
+            <span class="badge phase-badge phase-{{ datasheet.phase }}">{{ datasheet.phase }}</span>
+            <a href="{{ url_for('admin_dashboard', nama='ketua') }}" class="btn-sm">Kembali</a>
+        </div>
+    </div>
+
+    <!-- PHASE CONTROL -->
+    <div class="card">
+        <h3 class="card-title">Kontrol Fase</h3>
+        <form method="POST" action="{{ url_for('set_phase', ds_id=datasheet.id) }}" class="phase-control-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="phase-options">
+                <label class="phase-option {% if datasheet.phase == 'filling' %}active{% endif %}">
+                    <input type="radio" name="phase" value="filling" {% if datasheet.phase == 'filling' %}checked{% endif %}>
+                    <span class="phase-name">Filling</span>
+                    <span class="phase-desc">Mahasiswa mengisi pilihan</span>
+                </label>
+                <label class="phase-option {% if datasheet.phase == 'evaluation' %}active{% endif %}">
+                    <input type="radio" name="phase" value="evaluation" {% if datasheet.phase == 'evaluation' %}checked{% endif %}>
+                    <span class="phase-name">Evaluation</span>
+                    <span class="phase-desc">Admin mengevaluasi</span>
+                </label>
+                <label class="phase-option {% if datasheet.phase == 'announcement' %}active{% endif %}">
+                    <input type="radio" name="phase" value="announcement" {% if datasheet.phase == 'announcement' %}checked{% endif %}>
+                    <span class="phase-name">Announcement</span>
+                    <span class="phase-desc">Pengumuman hasil</span>
+                </label>
+            </div>
+            <button type="submit" class="btn-submit" style="width:auto; padding: 10px 24px; margin-top: 16px;">Ubah Fase</button>
+        </form>
+    </div>
+
+    <!-- SUB MENU TABS -->
+    <div class="card tab-menu">
+        <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='overview') }}" class="tab-link {% if tab == 'overview' %}active{% endif %}">Ringkasan</a>
+        <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='students') }}" class="tab-link {% if tab == 'students' %}active{% endif %}">Data Mahasiswa</a>
+        <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='votes') }}" class="tab-link {% if tab == 'votes' %}active{% endif %}">Voting Koordinator</a>
+        <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='rejections') }}" class="tab-link {% if tab == 'rejections' %}active{% endif %}">Penolakan</a>
+        <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='stats') }}" class="tab-link {% if tab == 'stats' %}active{% endif %}">Statistik Divisi</a>
+    </div>
+
+    <!-- TAB CONTENT -->
+    {% if tab == 'overview' %}
+    <div class="card">
+        <h3 class="card-title">Ringkasan Data Sheet</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-number">{{ total }}</span>
+                <span class="stat-label">Total Mahasiswa</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number green">{{ sudah }}</span>
+                <span class="stat-label">Sudah Memilih</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number orange">{{ belum }}</span>
+                <span class="stat-label">Belum Memilih</span>
+            </div>
+        </div>
+
+        <h4 class="sub-title" style="margin-top:24px;">Master Divisi</h4>
+        <div class="divisi-tags">
+            {% for div in datasheet.divisions %}
+            <span class="divisi-tag">{{ div.name }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% elif tab == 'students' %}
+    <div class="card">
+        <h3 class="card-title">Data Mahasiswa</h3>
+        <form method="POST" action="{{ url_for('save_evaluation', ds_id=datasheet.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% for m in students %}
+            <div class="student-row" style="border-bottom: 1px solid var(--border); padding: 20px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+                    <!-- Left: Basic Info -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <span class="td-nim" style="font-size: 16px;">{{ m.nim }}</span>
+                            <span style="font-weight: 600; font-size: 16px;">{{ m.nama }}</span>
+                            {% if m.ipk > 3.5 %}
+                            <span class="badge badge-blue">ELITE {{ m.ipk }}</span>
+                            {% else %}
+                            <span class="badge badge-gray">IPK {{ m.ipk }}</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Tawaran Info -->
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px;">
+                            {% if m.tawaran1 %}
+                            <div style="background: var(--primary-light); padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--primary);">
+                                <div style="font-size: 11px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px;">TAWARAN 1</div>
+                                <div style="font-weight: 600; font-size: 14px;">{{ m.tawaran1 }}</div>
+                                {% if m.alasan_tawaran1 %}
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">{{ m.alasan_tawaran1 }}</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if m.tawaran2 %}
+                            <div style="background: #D1FAE5; padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--success);">
+                                <div style="font-size: 11px; font-weight: 700; color: #065F46; margin-bottom: 4px;">TAWARAN 2</div>
+                                <div style="font-weight: 600; font-size: 14px;">{{ m.tawaran2 }}</div>
+                                {% if m.alasan_tawaran2 %}
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">{{ m.alasan_tawaran2 }}</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Penolakan Info -->
+                        {% if m.alasan_penolakan %}
+                        <div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--danger); margin-top: 12px;">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--danger); margin-bottom: 4px;">ALASAN PENOLAKAN</div>
+                            <div style="font-size: 13px; color: var(--text);">{{ m.alasan_penolakan }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Right: Admin Inputs -->
+                    <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;">
+                        <div>
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Jabatan Final</label>
+                            <select name="jabatan_{{ m.nim }}" class="select-sm" style="min-width: 120px;">
+                                <option value="" {% if not m.jabatan_final %}selected{% endif %}>- Pilih -</option>
+                                <option value="Koordinator" {% if m.jabatan_final == 'Koordinator' %}selected{% endif %}>Koordinator</option>
+                                <option value="Anggota" {% if m.jabatan_final == 'Anggota' %}selected{% endif %}>Anggota</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Divisi Final</label>
+                            <select name="divisi_{{ m.nim }}" class="select-sm" style="min-width: 140px;">
+                                <option value="" {% if not m.divisi_final %}selected{% endif %}>- Pilih -</option>
+                                {% for div in divisions %}
+                                <option value="{{ div }}" {% if m.divisi_final == div %}selected{% endif %}>{{ div }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="text-align: center; min-width: 80px;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Status</label>
+                            {% if m.jabatan_final %}
+                            <span class="badge badge-green">SELESAI</span>
+                            {% else %}
+                            <span class="badge badge-gray">PROSES</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reset Password (inline, below) -->
+                <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                    <form method="POST" action="{{ url_for('reset_password', ds_id=datasheet.id, nim=m.nim) }}" class="inline-form" onsubmit="event.stopPropagation();">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="text" name="new_password" placeholder="Password baru" class="input-sm" style="width: 140px;" required>
+                        <button type="submit" class="btn-sm btn-red">Reset</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div style="margin-top: 24px; text-align: right; padding-top: 20px; border-top: 2px solid var(--border);">
+                <button type="submit" class="btn-submit" style="width: auto; padding: 14px 40px; font-size: 16px;">Simpan Semua Perubahan</button>
+            </div>
+        </form>
+    </div>
+
+    {% elif tab == 'votes' %}
+    <div class="card">
+        <h3 class="card-title">Voting Koordinator per Divisi</h3>
+        {% for div_name, div_data in div_stats.items() %}
+        <div class="vote-section">
+            <h4 class="vote-div-title">{{ div_name }}</h4>
+            {% if div_data.top_koor %}
+            <div class="top-koor-list">
+                {% for k in div_data.top_koor %}
+                <div class="top-koor-item">
+                    <span class="koor-rank">#{{ loop.index }}</span>
+                    <span class="koor-name">{{ k.nama }}</span>
+                    <span class="koor-votes">{{ k.votes }} suara</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted">Belum ada voting untuk divisi ini.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <h4 class="sub-title" style="margin-top:32px;">Detail Voting per Mahasiswa</h4>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>NIM</th>
+                        <th>Nama</th>
+                        {% for div in divisions %}
+                        <th>{{ div }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in all_votes %}
+                    <tr>
+                        <td class="td-nim">{{ v.nim }}</td>
+                        <td>{{ v.nama }}</td>
+                        {% for div in divisions %}
+                        <td>
+                            {% set vote = v.votes|selectattr("divisi", "equalto", div)|first %}
+                            {{ vote.koor if vote else '-' }}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif tab == 'rejections' %}
+    <div class="card">
+        <h3 class="card-title">Mahasiswa yang Menolak Tawaran</h3>
+        {% if rejections %}
+        <div class="rejection-list">
+            {% for r in rejections %}
+            <div class="rejection-card">
+                <div class="rejection-header">
+                    <span class="rejection-name">{{ r.nama }}</span>
+                    <span class="rejection-nim">{{ r.nim }}</span>
+                    <span class="badge badge-blue">{{ r.divisi_final }}</span>
+                </div>
+                <div class="rejection-body">
+                    <span class="rejection-label">Alasan Penolakan:</span>
+                    <p class="rejection-text">{{ r.alasan_penolakan }}</p>
+                </div>
+                <div class="rejection-meta">
+                    <span>Tawaran yang ditolak: {{ r.tawaran1 or '-' }} / {{ r.tawaran2 or '-' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top:24px;">
+            <a href="{{ url_for('datasheet_detail', ds_id=datasheet.id, tab='rejections') }}?export=csv" class="btn-sm btn-purple">Export CSV Alasan Penolakan</a>
+        </div>
+        {% else %}
+        <p class="text-muted">Tidak ada mahasiswa yang menolak tawaran.</p>
+        {% endif %}
+    </div>
+
+    {% elif tab == 'stats' %}
+    <div class="card">
+        <h3 class="card-title">Statistik Penempatan Divisi</h3>
+        <div class="div-stats-grid">
+            {% for div_name, div_data in div_stats.items() %}
+            <div class="div-stat-box">
+                <div class="div-stat-header">
+                    <span class="div-stat-name">{{ div_name }}</span>
+                    <span class="div-stat-pct">{{ div_data.percentage }}%</span>
+                </div>
+                <div class="div-stat-bar">
+                    <div class="div-stat-fill" style="width: {{ div_data.percentage }}%"></div>
+                </div>
+                <div class="div-stat-count">{{ div_data.count }} mahasiswa</div>
+
+                <div class="koor-section">
+                    <span class="koor-label">Calon Koordinator (IPK > 3.5):</span>
+                    {% if div_data.candidates %}
+                    <div class="koor-list">
+                        {% for c in div_data.candidates %}
+                        <span class="koor-tag">{{ c.nama }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <span class="text-muted" style="font-size:12px;">Tidak ada kandidat</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

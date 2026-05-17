@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Pilih Koordinator - {{ datasheet.name }}{% endblock %}
+
+{% block content %}
+<div class="student-wrapper">
+    <!-- Datasheet Info Bar -->
+    <div class="card datasheet-bar">
+        <div class="ds-info">
+            <span class="ds-label">DATASHEET AKTIF</span>
+            <span class="ds-name">{{ datasheet.name }}</span>
+            <span class="badge badge-blue">{{ datasheet.phase|upper }}</span>
+        </div>
+        {% if time_remaining %}
+        <div class="ds-deadline">
+            <span class="dl-label">Sisa Waktu:</span>
+            <span id="live-countdown" class="dl-value font-monospace" data-ds-id="{{ datasheet.id }}">
+                {{ time_remaining.days }} hari {{ time_remaining.hours }} jam {{ time_remaining.minutes }} menit
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sub-Menu Navigation -->
+    {% if nav_items %}
+    <div class="card">
+        <h3 class="card-title">Navigasi Pengisian</h3>
+        <div class="student-tab-menu tab-menu">
+            {% for item in nav_items %}
+            <a href="{{ url_for('go_to_step', step_id=item.id) }}" 
+               class="tab-link {% if request.endpoint == item.url %}active{% endif %}
+                      {% if not item.accessible %}disabled{% endif %}">
+                <span class="tab-step">{% if item.completed %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>
+                <span>{{ item.name }}</span>
+                {% if item.completed %}
+                    <span class="tab-status done">Selesai</span>
+                {% elif item.accessible %}
+                    <span class="tab-status current">Buka</span>
+                {% else %}
+                    <span class="tab-status">Terkunci</span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Voting Form -->
+    <div class="card">
+        <h3 class="card-title" style="color: var(--primary);">Pilih Koordinator per Divisi</h3>
+        <p class="section-desc">Pilih calon koordinator (IPK > 3.5) untuk setiap divisi. Kosongkan jika tidak ingin memilih.</p>
+
+        <form method="POST" action="{{ url_for('submit_koordinator') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% for div_name in divisions %}
+            <div class="koor-group" style="margin-bottom: 16px;">
+                <label>Divisi: {{ div_name }}</label>
+                <select name="koor_{{ div_name }}">
+                    <option value="">-- Pilih Koordinator --</option>
+                    {% for s in elite_students %}
+                    <option value="{{ s.nim }}" 
+                            {% if existing_votes.get(div_name) == s.nim %}selected{% endif %}>
+                        {{ s.nama }} ({{ s.nim }}) - IPK: {{ s.ipk }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if existing_votes.get(div_name) %}
+                <div class="saved-status" style="margin-top: 8px;">
+                    &#10003; Sudah memilih: {{ (elite_students|selectattr('nim', 'equalto', existing_votes.get(div_name))|first).nama }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="form-actions" style="margin-top: 24px;">
+                <button type="submit" class="btn-submit">Simpan Semua Pilihan</button>
+                <a href="{{ url_for('student_dashboard') }}" class="btn-secondary">Kembali ke Dashboard</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if time_remaining %}
+<script src="{{ url_for('static', filename='js/countdown.js') }}"></script>
+<script src="{{ url_for('static', filename='js/init-countdown.js') }}"></script>
+{% endif %}
+{% endblock %}

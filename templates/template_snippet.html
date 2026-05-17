@@ -1,0 +1,54 @@
+<!--
+TAMBAHKAN INI KE student_dashboard.html, student_pilih_saran.html, 
+student_pilih_jabatan.html, dan student_pilih_koordinator.html
+-->
+
+<!-- Sub-Menu Navigasi Step -->
+{% if nav_items %}
+<div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+        <strong>Navigasi Pengisian</strong>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for item in nav_items %}
+        <a href="{{ url_for('go_to_step', step_id=item.id) }}" 
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+                  {% if item.current %}active{% endif %}
+                  {% if not item.accessible %}disabled{% endif %}">
+            <span>
+                {% if item.completed %}
+                    <span class="badge bg-success me-2">&#10003;</span>
+                {% else %}
+                    <span class="badge bg-secondary me-2">{{ loop.index }}</span>
+                {% endif %}
+                {{ item.name }}
+            </span>
+            {% if item.completed %}
+                <span class="badge bg-success">Selesai</span>
+            {% elif item.accessible %}
+                <span class="badge bg-primary">Buka</span>
+            {% else %}
+                <span class="badge bg-secondary">Terkunci</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Countdown Timer Live -->
+{% if time_remaining %}
+<div class="alert alert-info d-flex align-items-center justify-content-between">
+    <div>
+        <strong>Sisa Waktu:</strong>
+        <span id="live-countdown" class="ms-2 font-monospace">Memuat...</span>
+    </div>
+    <span class="badge bg-dark">Deadline: {{ datasheet.deadline.strftime('%d %b %Y %H:%M') }}</span>
+</div>
+<script src="{{ url_for('static', filename='js/countdown.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initCountdown({{ datasheet.id }}, 'live-countdown');
+    });
+</script>
+{% endif %}

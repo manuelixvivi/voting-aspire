@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Pengumuman Penempatan{% endblock %}
+{% block extra_css %}
+<style>
+@media print {
+    body { background: white; }
+    .navbar { display: none; }
+    .btn-print { display: none; }
+    .congrats-card { border: 2px solid #2563EB; box-shadow: none; margin: 0; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="student-wrapper">
+    <div class="card datasheet-bar">
+        <div class="ds-info">
+            <span class="ds-label">Datasheet</span>
+            <span class="ds-name">{{ datasheet.name }}</span>
+            <span class="badge badge-green">PENGUMUMAN</span>
+        </div>
+    </div>
+</div>
+
+<div class="congrats-card">
+    <div class="congrats-header">
+        <h1>PENGUMUMAN PENEMPATAN</h1>
+        <p>Datasheet: {{ datasheet.name }}</p>
+    </div>
+
+    <div class="congrats-body">
+        <p class="congrats-intro">Dengan ini diberitahukan bahwa</p>
+        <h2 class="congrats-name">{{ current_user.nama }}</h2>
+        <p class="congrats-nim">NIM: {{ current_user.nim }}</p>
+    </div>
+
+    <div class="congrats-box">
+        <p class="box-label">JABATAN FINAL</p>
+        <h3 class="box-jabatan">{{ current_user.pilihan_final }}</h3>
+        <p class="box-divisi">Divisi Penempatan: {{ current_user.divisi_final }}</p>
+    </div>
+
+    {% if current_user.ipk > 3.5 and current_user.pilihan_final == 'Koordinator' %}
+    <div class="elite-badge">ELITE ACCESS GRANTED</div>
+    <p class="elite-note">Diberikan kepada mahasiswa dengan IPK di atas 3.5</p>
+    {% endif %}
+
+    <!-- Announcement Message from Admin -->
+    {% if datasheet.announcement_message %}
+    <div class="congrats-box" style="background: #FEF3C7; border: 2px solid #D97706; margin: 24px 32px;">
+        <p class="box-label" style="color: #92400E;">PENGUMUMAN</p>
+        <p style="font-size: 15px; color: #92400E; line-height: 1.6; white-space: pre-line;">{{ datasheet.announcement_message }}</p>
+    </div>
+    {% endif %}
+
+    <div class="congrats-footer">
+        <p>Dokumen ini merupakan bukti resmi penempatan jabatan.</p>
+        <p>Silakan screenshot atau simpan sebagai dokumen pribadi.</p>
+    </div>
+</div>
+
+<div class="print-actions">
+    <button onclick="window.print()" class="btn-print">Cetak / Simpan PDF</button>
+</div>
+{% endblock %}

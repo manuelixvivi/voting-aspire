@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Admin{% endblock %}
+{% block content %}
+<div class="admin-wrapper">
+    <div class="admin-header">
+        <div>
+            <h1 class="page-title">Dashboard Admin</h1>
+            <p class="page-subtitle">Kelola datasheet dan data mahasiswa</p>
+        </div>
+    </div>
+
+    <!-- CREATE DATASHEET -->
+    <div class="card">
+        <h3 class="card-title">Buat Data Sheet Baru</h3>
+        <form method="POST" action="{{ url_for('create_datasheet') }}" class="ds-create-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-row">
+                <div class="form-group flex-2">
+                    <label>Nama Data Sheet</label>
+                    <input type="text" name="name" required placeholder="Contoh: Angkatan 2024 Gelombang 1">
+                </div>
+                <div class="form-group flex-2">
+                    <label>Deskripsi</label>
+                    <input type="text" name="description" placeholder="Keterangan tambahan">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group flex-1">
+                    <label>Waktu Mulai (Opsional)</label>
+                    <input type="datetime-local" name="start_time">
+                    <p class="input-hint">Sistem akan otomatis aktif saat waktu mulai tercapai.</p>
+                </div>
+                <div class="form-group flex-1">
+                    <label>Deadline (Opsional)</label>
+                    <input type="datetime-local" name="deadline">
+                    <p class="input-hint">Sistem akan otomatis nonaktif saat deadline terlewati.</p>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group flex-full">
+                    <label>Master Divisi (pisahkan dengan koma)</label>
+                    <input type="text" name="divisions" required placeholder="Contoh: Divisi Akademik, Divisi Humas, Divisi PSDM, Divisi Olahraga">
+                    <p class="input-hint">Daftar divisi ini akan menjadi pilihan dropdown untuk mahasiswa dan admin.</p>
+                </div>
+                <div class="form-group flex-submit">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn-submit">Buat Data Sheet</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- DATASHEETS LIST -->
+    <div class="card">
+        <h3 class="card-title">Daftar Data Sheet</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nama</th>
+                        <th>Status</th>
+                        <th>Jadwal</th>
+                        <th>Fase</th>
+                        <th>Mhs</th>
+                        <th>Div</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ds in datasheets %}
+                    <tr>
+                        <td class="td-nim">{{ ds.id }}</td>
+                        <td><strong>{{ ds.name }}</strong></td>
+                        <td>
+                            {% if ds.is_schedule_active() %}
+                            <span class="badge badge-green">AKTIF</span>
+                            {% if ds.is_active %}<span class="badge badge-blue">MANUAL</span>{% else %}<span class="badge badge-orange">AUTO</span>{% endif %}
+                            {% else %}
+                            <span class="badge badge-gray">NONAKTIF</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ds.start_time %}
+                            <div class="schedule-info">
+                                <span class="schedule-label">Mulai:</span>
+                                <span class="schedule-value">{{ ds.start_time.strftime('%d %b %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            {% if ds.deadline %}
+                            <div class="schedule-info">
+                                <span class="schedule-label">Selesai:</span>
+                                <span class="schedule-value">{{ ds.deadline.strftime('%d %b %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            {% if not ds.start_time and not ds.deadline %}
+                            <span class="text-muted">Manual only</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge phase-badge phase-{{ ds.phase }}">{{ ds.phase }}</span>
+                        </td>
+                        <td>{{ ds.students|length }}</td>
+                        <td>{{ ds.divisions|length }}</td>
+                        <td>
+                            <div class="action-group">
+                                <form method="POST" action="{{ url_for('activate_datasheet', ds_id=ds.id) }}" class="inline-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-sm {% if ds.is_active %}btn-red{% else %}btn-green{% endif %}">
+                                        {% if ds.is_active %}Matikan{% else %}Aktifkan{% endif %}
+                                    </button>
+                                </form>
+
+                                <a href="{{ url_for('datasheet_detail', ds_id=ds.id) }}" class="btn-sm btn-blue">Detail</a>
+
+                                <a href="{{ url_for('download_template', ds_id=ds.id) }}" class="btn-sm btn-purple">Template</a>
+
+                                <form method="POST" action="{{ url_for('delete_datasheet', ds_id=ds.id) }}" class="inline-form" onsubmit="return confirm('Yakin hapus datasheet ini? Semua data mahasiswa di dalamnya akan ikut terhapus.')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-sm btn-red-outline">Hapus</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="upload-row">
+                        <td colspan="8">
+                            <form method="POST" action="{{ url_for('upload_csv', ds_id=ds.id) }}" enctype="multipart/form-data" class="csv-upload-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <span class="upload-label">Upload CSV ke "{{ ds.name }}":</span>
+                                <input type="file" name="csv_file" accept=".csv" required>
+                                <button type="submit" class="btn-sm">Upload</button>
+                                <span class="upload-hint">Format: nim, nama, ipk, password, tawaran1, alasan_tawaran1, tawaran2, alasan_tawaran2</span>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">Belum ada data sheet. Buat baru di atas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
