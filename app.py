@@ -402,43 +402,6 @@ def log_security_event(event_type, nim=None, details=None):
     except Exception:
         db.session.rollback()
 
-# ==================== AUTO INIT FOR SERVERLESS ====================
-# FIX: Vercel serverless tidak menjalankan __main__ block
-# Inisialisasi database harus dilakukan saat modul di-import
-_db_initialized = False
-
-def ensure_db_initialized():
-    global _db_initialized
-    if _db_initialized:
-        return True
-    try:
-        with app.app_context():
-            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
-            db.Model.metadata.create_all(bind=db.engine)
-            app.logger.info("Tables created via metadata.create_all()")
-
-            # Check if admin exists
-            ketua = db.session.get(User, 'ketua')
-            if not ketua:
-                app.logger.info("Admin not found, running init_db()")
-                init_db()
-                # Verify after init
-                ketua_check = db.session.get(User, 'ketua')
-                app.logger.info(f"After init_db: ketua exists = {ketua_check is not None}")
-            else:
-                app.logger.info("Admin already exists, skipping init_db()")
-        _db_initialized = True
-        app.logger.info("✅ Auto-init complete")
-        return True
-    except Exception as e:
-        app.logger.error(f"❌ Auto-init failed: {e}")
-        import traceback
-        app.logger.error(traceback.format_exc())
-        return False
-
-# Try to init on module load
-ensure_db_initialized()
-
 # ==================== ROUTES ====================
 @login_manager.user_loader
 def load_user(nim):
@@ -1487,6 +1450,45 @@ def init_db():
         db.session.commit()
 
 
+# ==================== AUTO INIT FOR SERVERLESS ====================
+# FIX: Vercel serverless tidak menjalankan __main__ block
+# Inisialisasi database harus dilakukan saat modul di-import
+# Ditempatkan SETELAH init_db() didefinisikan untuk menghindari NameError
+_db_initialized = False
+
+def ensure_db_initialized():
+    global _db_initialized
+    if _db_initialized:
+        return True
+    try:
+        with app.app_context():
+            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
+            db.Model.metadata.create_all(bind=db.engine)
+            app.logger.info("Tables created via metadata.create_all()")
+
+            # Check if admin exists
+            ketua = db.session.get(User, 'ketua')
+            if not ketua:
+                app.logger.info("Admin not found, running init_db()")
+                init_db()
+                # Verify after init
+                ketua_check = db.session.get(User, 'ketua')
+                app.logger.info(f"After init_db: ketua exists = {ketua_check is not None}")
+            else:
+                app.logger.info("Admin already exists, skipping init_db()")
+        _db_initialized = True
+        app.logger.info("✅ Auto-init complete")
+        return True
+    except Exception as e:
+        app.logger.error(f"❌ Auto-init failed: {e}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return False
+
+# Try to init on module load (now safe because init_db is defined above)
+ensure_db_initialized()
+
+
 @app.route('/force-reset-admin-aspire')
 def force_reset_admin_aspire():
     try:
@@ -1549,6 +1551,44 @@ def force_reset_admin_aspire():
         import traceback
         app.logger.error(f"Reset failed: {traceback.format_exc()}")
         return f"❌ Gagal: {str(e)}", 500
+
+# ==================== AUTO INIT FOR SERVERLESS ====================
+# FIX: Vercel serverless tidak menjalankan __main__ block
+# Ditempatkan SETELAH init_db() didefinisikan untuk menghindari NameError
+_db_initialized = False
+
+def ensure_db_initialized():
+    global _db_initialized
+    if _db_initialized:
+        return True
+    try:
+        with app.app_context():
+            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
+            db.Model.metadata.create_all(bind=db.engine)
+            app.logger.info("Tables created via metadata.create_all()")
+
+            # Check if admin exists
+            ketua = db.session.get(User, 'ketua')
+            if not ketua:
+                app.logger.info("Admin not found, running init_db()")
+                init_db()
+                # Verify after init
+                ketua_check = db.session.get(User, 'ketua')
+                app.logger.info(f"After init_db: ketua exists = {ketua_check is not None}")
+            else:
+                app.logger.info("Admin already exists, skipping init_db()")
+        _db_initialized = True
+        app.logger.info("✅ Auto-init complete")
+        return True
+    except Exception as e:
+        app.logger.error(f"❌ Auto-init failed: {e}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return False
+
+# Try to init on module load (now safe because init_db is defined above)
+ensure_db_initialized()
+
 
 if __name__ == '__main__':
     init_db()
