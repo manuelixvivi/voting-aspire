@@ -408,6 +408,35 @@ def log_security_event(event_type, nim=None, details=None):
     except Exception:
         db.session.rollback()
 
+
+# ==================== SCHEMA FIX ====================
+def fix_schema():
+    """Fix schema type mismatches without dropping data"""
+    try:
+        from sqlalchemy import text
+        with app.app_context():
+            # Fix users.datasheet_id from VARCHAR to INTEGER
+            db.session.execute(text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'users' 
+                        AND column_name = 'datasheet_id'
+                        AND data_type IN ('character varying', 'varchar', 'text')
+                    ) THEN
+                        ALTER TABLE users ALTER COLUMN datasheet_id TYPE INTEGER USING (NULLIF(datasheet_id, '')::INTEGER);
+                    END IF;
+                END $$;
+            """))
+            db.session.commit()
+            app.logger.info("Schema fixed: users.datasheet_id converted to INTEGER")
+            return True
+    except Exception as e:
+        app.logger.error(f"Schema fix failed: {e}")
+        db.session.rollback()
+        return False
+
 # ==================== ROUTES ====================
 @login_manager.user_loader
 def load_user(nim):
@@ -1494,7 +1523,10 @@ def ensure_db_initialized():
         with app.app_context():
             # FIX: Create tables if not exist
             db.Model.metadata.create_all(bind=db.engine)
-            app.logger.info("Tables dropped and recreated via metadata.create_all()")
+            app.logger.info("Tables created via metadata.create_all()")
+
+            # FIX: Fix schema type mismatches (VARCHAR -> INTEGER)
+            fix_schema()
 
             # Check if admin exists
             ketua = db.session.get(User, 'ketua')
@@ -1523,9 +1555,10 @@ ensure_db_initialized()
 def force_reset_admin_aspire():
     try:
         with app.app_context():
-            # 1. Buat tabel jika belum ada
+            # 1. Buat tabel jika belum ada + fix schema
             db.create_all()
-            app.logger.info("Tables created/verified")
+            fix_schema()
+            app.logger.info("Tables created/verified and schema fixed")
 
             # 2. Hapus admin lama jika ada (ignore if not exists)
             for nim in ['ketua', 'wakil']:
@@ -1595,7 +1628,10 @@ def ensure_db_initialized():
         with app.app_context():
             # FIX: Create tables if not exist
             db.Model.metadata.create_all(bind=db.engine)
-            app.logger.info("Tables dropped and recreated via metadata.create_all()")
+            app.logger.info("Tables created via metadata.create_all()")
+
+            # FIX: Fix schema type mismatches (VARCHAR -> INTEGER)
+            fix_schema()
 
             # Check if admin exists
             ketua = db.session.get(User, 'ketua')
