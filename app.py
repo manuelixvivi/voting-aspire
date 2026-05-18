@@ -1266,6 +1266,43 @@ def reset_password(ds_id, nim):
 
     return redirect(request.referrer or url_for('datasheet_detail', ds_id=ds_id, tab='students'))
 
+@app.route('/admin/datasheet/<int:ds_id>/reset-password-ajax', methods=['POST'])
+@login_required
+@admin_required
+def reset_password_ajax(ds_id):
+    ds = db.session.get(DataSheet, ds_id) or abort(404)
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'success': False, 'message': 'Invalid request.'}), 400
+
+    nim = sanitize_input(data.get('nim', '')).strip()
+    new_pass = data.get('new_password', '').strip()
+
+    if not nim or not new_pass:
+        return jsonify({'success': False, 'message': 'NIM dan password wajib diisi.'}), 400
+
+    user = db.session.get(User, nim)
+    if not user:
+        return jsonify({'success': False, 'message': 'User tidak ditemukan.'}), 404
+
+    if len(new_pass) < 8:
+        return jsonify({'success': False, 'message': 'Password minimal 8 karakter.'}), 400
+
+    if not re.search(r'[A-Za-z]', new_pass) or not re.search(r'[0-9]', new_pass):
+        return jsonify({'success': False, 'message': 'Password harus mengandung huruf dan angka.'}), 400
+
+    try:
+        user.password = generate_password_hash(new_pass)
+        user.password_changed = False
+        db.session.commit()
+        log_security_event('password_reset', current_user.nim, f'Target: {nim}')
+        return jsonify({'success': True, 'message': f'Password {user.nama} berhasil direset.'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Password reset error: {e}')
+        return jsonify({'success': False, 'message': 'Terjadi kesalahan server.'}), 500
+
 @app.route('/admin/datasheet/<int:ds_id>/evaluate')
 @login_required
 @admin_required
