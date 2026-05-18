@@ -84,7 +84,6 @@
             {% for m in students %}
             <div class="student-row" style="border-bottom: 1px solid var(--border); padding: 20px 0;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
-                    <!-- Left: Basic Info -->
                     <div style="flex: 1; min-width: 200px;">
                         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                             <span class="td-nim" style="font-size: 16px;">{{ m.nim }}</span>
@@ -96,7 +95,6 @@
                             {% endif %}
                         </div>
 
-                        <!-- Tawaran Info -->
                         <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px;">
                             {% if m.tawaran1 %}
                             <div style="background: var(--primary-light); padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--primary);">
@@ -118,7 +116,6 @@
                             {% endif %}
                         </div>
 
-                        <!-- Penolakan Info -->
                         {% if m.alasan_penolakan %}
                         <div style="background: #FEF2F2; padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--danger); margin-top: 12px;">
                             <div style="font-size: 11px; font-weight: 700; color: var(--danger); margin-bottom: 4px;">ALASAN PENOLAKAN</div>
@@ -127,7 +124,6 @@
                         {% endif %}
                     </div>
 
-                    <!-- Right: Admin Inputs -->
                     <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;">
                         <div>
                             <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Jabatan Final</label>
@@ -157,19 +153,15 @@
                     </div>
                 </div>
 
-                <!-- Alasan Final -->
                 <div style="margin-top: 12px; padding: 12px; background: var(--bg); border-radius: 8px;">
                     <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Alasan Final / Catatan Admin</label>
                     <textarea name="alasan_final_{{ m.nim }}" rows="2" placeholder="Catatan atau alasan penempatan..." style="width: 100%; min-width: 300px; font-size: 13px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical;">{{ m.alasan_final or '' }}</textarea>
                 </div>
 
-                <!-- Reset Password (inline, below) -->
                 <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
-                    <form method="POST" action="{{ url_for('reset_password', ds_id=datasheet.id, nim=m.nim) }}" class="inline-form" onsubmit="event.stopPropagation();">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="text" name="new_password" placeholder="Password baru" class="input-sm" style="width: 140px;" required>
-                        <button type="submit" class="btn-sm btn-red">Reset</button>
-                    </form>
+                    <input type="text" id="reset-pass-{{ m.nim }}" placeholder="Password baru" class="input-sm" style="width: 140px;">
+                    <button type="button" class="btn-sm btn-red" onclick="resetPassword('{{ m.nim }}')">Reset</button>
+                    <span id="reset-msg-{{ m.nim }}" style="font-size: 12px; display: none;"></span>
                 </div>
             </div>
             {% endfor %}
@@ -180,7 +172,26 @@
         </form>
     </div>
 
-    {% elif tab == 'votes' %}
+    <script>
+    function resetPassword(nim) {
+        const input = document.getElementById('reset-pass-' + nim);
+        const msg = document.getElementById('reset-msg-' + nim);
+        const newPass = input.value.trim();
+
+        if (!newPass) { msg.textContent = 'Password tidak boleh kosong'; msg.style.color = '#DC2626'; msg.style.display = 'inline'; return; }
+        if (newPass.length < 8) { msg.textContent = 'Minimal 8 karakter'; msg.style.color = '#DC2626'; msg.style.display = 'inline'; return; }
+        if (!/[A-Za-z]/.test(newPass) || !/[0-9]/.test(newPass)) { msg.textContent = 'Harus ada huruf dan angka'; msg.style.color = '#DC2626'; msg.style.display = 'inline'; return; }
+
+        fetch('{{ url_for("reset_password_ajax", ds_id=datasheet.id) }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+            body: JSON.stringify({ nim: nim, new_password: newPass })
+        })
+        .then(r => r.json())
+        .then(data => { msg.textContent = data.message; msg.style.color = data.success ? '#059669' : '#DC2626'; msg.style.display = 'inline'; if (data.success) input.value = ''; })
+        .catch(err => { msg.textContent = 'Error: ' + err.message; msg.style.color = '#DC2626'; msg.style.display = 'inline'; });
+    }
+    </script>{% elif tab == 'votes' %}
     <div class="card">
         <h3 class="card-title">Voting Koordinator per Divisi</h3>
         {% for div_name, div_data in div_stats.items() %}
@@ -265,8 +276,8 @@
 
     {% elif tab == 'stats' %}
     <div class="card">
-    <h3 class="card-title">Statistik Penempatan Divisi</h3>
-    <div class="div-stats-grid">
+        <h3 class="card-title">Statistik Penempatan Divisi</h3>
+        <div class="div-stats-grid">
         {% for div_name, div_data in div_stats.items() %}
         <div class="div-stat-box">
             <div class="div-stat-header">
@@ -291,6 +302,7 @@
             </div>
         </div>
         {% endfor %}
+        </div>
     </div>
     {% endif %}
 </div>
