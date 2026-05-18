@@ -100,8 +100,8 @@
                         <td>
                             <span class="badge phase-badge phase-{{ ds.phase }}">{{ ds.phase }}</span>
                         </td>
-                        <td>{{ ds.students|length }}</td>
-                        <td>{{ ds.divisions|length }}</td>
+                        <td>{{ ds.get_student_count() }}</td>
+                        <td>{{ ds.get_division_count() }}</td>
                         <td>
                             <div class="action-group">
                                 <form method="POST" action="{{ url_for('activate_datasheet', ds_id=ds.id) }}" class="inline-form">

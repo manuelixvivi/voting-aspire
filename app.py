@@ -251,6 +251,12 @@ class DataSheet(db.Model):
                 }
         return None
 
+    def get_student_count(self):
+        return User.query.filter_by(datasheet_id=self.id, role='mahasiswa').count()
+
+    def get_division_count(self):
+        return Division.query.filter_by(datasheet_id=self.id).count()
+
 class Division(db.Model):
     __tablename__ = 'divisions'
     id = db.Column(db.Integer, primary_key=True)
@@ -1294,6 +1300,30 @@ def security_logs():
     return render_template('admin_security_logs.html', logs=logs, page=page, total=total, per_page=per_page)
 
 # ==================== DEBUG ENDPOINTS ====================
+@app.route('/fix-database-schema')
+def fix_database_schema():
+    """Fix schema issues without dropping data"""
+    try:
+        with app.app_context():
+            from sqlalchemy import text
+            # Check if users.datasheet_id is wrong type and fix it
+            db.session.execute(text('''
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name = 'users' AND column_name = 'datasheet_id'
+                               AND data_type = 'character varying') THEN
+                        ALTER TABLE users ALTER COLUMN datasheet_id TYPE INTEGER USING (datasheet_id::INTEGER);
+                    END IF;
+                END $$;
+            '''))
+            db.session.commit()
+            return jsonify({'status': 'Schema fixed'}), 200
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/debug-admin')
 def debug_admin():
     """Debug endpoint untuk cek status akun admin"""
@@ -1462,9 +1492,9 @@ def ensure_db_initialized():
         return True
     try:
         with app.app_context():
-            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
+            # FIX: Create tables if not exist
             db.Model.metadata.create_all(bind=db.engine)
-            app.logger.info("Tables created via metadata.create_all()")
+            app.logger.info("Tables dropped and recreated via metadata.create_all()")
 
             # Check if admin exists
             ketua = db.session.get(User, 'ketua')
@@ -1493,7 +1523,7 @@ ensure_db_initialized()
 def force_reset_admin_aspire():
     try:
         with app.app_context():
-            # 1. Pastikan seluruh tabel terbuat di Supabase
+            # 1. Buat tabel jika belum ada
             db.create_all()
             app.logger.info("Tables created/verified")
 
@@ -1563,9 +1593,9 @@ def ensure_db_initialized():
         return True
     try:
         with app.app_context():
-            # FIX: Use db.Model.metadata.create_all() untuk memastikan semua model terdaftar
+            # FIX: Create tables if not exist
             db.Model.metadata.create_all(bind=db.engine)
-            app.logger.info("Tables created via metadata.create_all()")
+            app.logger.info("Tables dropped and recreated via metadata.create_all()")
 
             # Check if admin exists
             ketua = db.session.get(User, 'ketua')
