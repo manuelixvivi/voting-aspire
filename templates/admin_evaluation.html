@@ -119,6 +119,12 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- Alasan Final -->
+            <div style="margin-top: 12px;">
+                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Alasan Final / Catatan Admin</label>
+                <textarea name="alasan_final_{{ m.nim }}" rows="2" placeholder="Catatan atau alasan penempatan..." style="width: 100%; min-width: 300px; font-size: 13px;">{{ m.alasan_final or '' }}</textarea>
+            </div>
         </div>
         {% endfor %}
 

@@ -48,7 +48,7 @@
     <!-- Voting Form -->
     <div class="card">
         <h3 class="card-title" style="color: var(--primary);">Pilih Koordinator per Divisi</h3>
-        <p class="section-desc">Pilih calon koordinator (IPK > 3.5) untuk setiap divisi. Kosongkan jika tidak ingin memilih.</p>
+        <p class="section-desc">Pilih calon koordinator untuk setiap divisi. Kosongkan jika tidak ingin memilih.</p>
 
         <form method="POST" action="{{ url_for('submit_koordinator') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -61,7 +61,7 @@
                     {% for s in elite_students %}
                     <option value="{{ s.nim }}" 
                             {% if existing_votes.get(div_name) == s.nim %}selected{% endif %}>
-                        {{ s.nama }} ({{ s.nim }}) - IPK: {{ s.ipk }}
+                        {{ s.nama }} ({{ s.nim }})
                     </option>
                     {% endfor %}
                 </select>

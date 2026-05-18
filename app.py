@@ -1304,8 +1304,7 @@ def save_evaluation(ds_id):
                 student.jabatan_final = pilihan
             if divisi:
                 student.divisi_final = divisi
-            if alasan_final:
-                student.alasan_final = alasan_final
+            student.alasan_final = alasan_final if alasan_final else None
 
         db.session.commit()
         log_security_event('evaluation_saved', current_user.nim, f'Datasheet: {ds_id}')

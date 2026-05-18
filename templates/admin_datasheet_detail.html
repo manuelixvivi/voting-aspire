@@ -157,6 +157,12 @@
                     </div>
                 </div>
 
+                <!-- Alasan Final -->
+                <div style="margin-top: 12px; padding: 12px; background: var(--bg); border-radius: 8px;">
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block;">Alasan Final / Catatan Admin</label>
+                    <textarea name="alasan_final_{{ m.nim }}" rows="2" placeholder="Catatan atau alasan penempatan..." style="width: 100%; min-width: 300px; font-size: 13px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical;">{{ m.alasan_final or '' }}</textarea>
+                </div>
+
                 <!-- Reset Password (inline, below) -->
                 <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
                     <form method="POST" action="{{ url_for('reset_password', ds_id=datasheet.id, nim=m.nim) }}" class="inline-form" onsubmit="event.stopPropagation();">
@@ -259,34 +265,34 @@
 
     {% elif tab == 'stats' %}
     <div class="card">
-        <h3 class="card-title">Statistik Penempatan Divisi</h3>
-        <div class="div-stats-grid">
-            {% for div_name, div_data in div_stats.items() %}
-            <div class="div-stat-box">
-                <div class="div-stat-header">
-                    <span class="div-stat-name">{{ div_name }}</span>
-                    <span class="div-stat-pct">{{ div_data.percentage }}%</span>
-                </div>
-                <div class="div-stat-bar">
-                    <div class="div-stat-fill" style="width: {{ div_data.percentage }}%"></div>
-                </div>
-                <div class="div-stat-count">{{ div_data.count }} mahasiswa</div>
-
-                <div class="koor-section">
-                    <span class="koor-label">Calon Koordinator (IPK > 3.5):</span>
-                    {% if div_data.candidates %}
-                    <div class="koor-list">
-                        {% for c in div_data.candidates %}
-                        <span class="koor-tag">{{ c.nama }}</span>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <span class="text-muted" style="font-size:12px;">Tidak ada kandidat</span>
-                    {% endif %}
-                </div>
+    <h3 class="card-title">Statistik Penempatan Divisi</h3>
+    <div class="div-stats-grid">
+        {% for div_name, div_data in div_stats.items() %}
+        <div class="div-stat-box">
+            <div class="div-stat-header">
+                <span class="div-stat-name">{{ div_name }}</span>
+                <span class="div-stat-pct">{{ div_data.percentage }}%</span>
             </div>
-            {% endfor %}
+            <div class="div-stat-bar">
+                <!-- Store the dynamic value safely in a data attribute -->
+                <div class="div-stat-fill" data-percentage="{{div_data.percentage}}"></div>
+            </div>
+            <div class="div-stat-count">{{ div_data.count }} mahasiswa</div>
+
+            <div class="koor-section">
+                <span class="koor-label">Calon Koordinator (IPK > 3.5):</span>
+                {% if div_data.candidates %}
+                <div class="koor-list">
+                    {% for c in div_data.candidates %}
+                    <span class="koor-tag">{{ c.nama }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
+    </div>
+</div>
     </div>
     {% endif %}
 </div>

@@ -35,13 +35,15 @@
 
     <div class="congrats-box">
         <p class="box-label">JABATAN FINAL</p>
-        <h3 class="box-jabatan">{{ current_user.pilihan_final }}</h3>
+        <h3 class="box-jabatan">{{ current_user.jabatan_final }}</h3>
         <p class="box-divisi">Divisi Penempatan: {{ current_user.divisi_final }}</p>
     </div>
 
-    {% if current_user.ipk > 3.5 and current_user.pilihan_final == 'Koordinator' %}
-    <div class="elite-badge">ELITE ACCESS GRANTED</div>
-    <p class="elite-note">Diberikan kepada mahasiswa dengan IPK di atas 3.5</p>
+    {% if current_user.alasan_final %}
+    <div class="congrats-box" style="background: #FEF3C7; border: 2px solid #D97706; margin: 24px 32px;">
+        <p class="box-label" style="color: #92400E;">Pesan Spesial</p>
+        <p style="font-size: 15px; color: #92400E; line-height: 1.6; white-space: pre-line;">{{ current_user.alasan_final }}</p>
+    </div>
     {% endif %}
 
     <!-- Announcement Message from Admin -->
